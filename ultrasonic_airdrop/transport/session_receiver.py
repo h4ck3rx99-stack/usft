@@ -158,6 +158,11 @@ class ReceiverSession:
         return self._stopped
 
     @property
+    def idle(self) -> bool:
+        """No transfer in progress (listening, or the last session has ended)."""
+        return self.state == ReceiverState.LISTENING or self.state in TERMINAL
+
+    @property
     def success(self) -> bool:
         """Last session completed with every file verified."""
         return self.state == ReceiverState.COMPLETE

@@ -177,6 +177,10 @@ def _run(station: Station, session: Session) -> int:
             runner.stop()
             return
         stop.set()
+        if getattr(session, "idle", False):
+            print("\nStopping.", file=sys.stderr)
+            runner.stop()
+            return
         print("\nCancelling… (Ctrl+C again to abort immediately)", file=sys.stderr)
         cancel = getattr(session, "cancel", None)
         if callable(cancel):
@@ -436,6 +440,38 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     return 0 if ok and res.receiver_success else 1
 
 
+def cmd_estimate(args: argparse.Namespace) -> int:
+    """Print the airtime estimate for files in every mode (plays nothing)."""
+    from ultrasonic_airdrop.files.chunker import cleanup_prepared, prepare_files
+    from ultrasonic_airdrop.transport.estimate import estimate_transfer_s
+
+    settings = _settings(args)
+    profile = get_profile(args.profile)
+    with tempfile.TemporaryDirectory(prefix="airdrop-est-") as tmp:
+        print("Preparing files (hashing/compressing)…", flush=True)
+        manifest, prepared = prepare_files([Path(p) for p in args.files], not args.no_compress, Path(tmp))
+        try:
+            sizes = [f.tx_size for f in manifest.files]
+            blob = len(manifest.to_blob())
+        finally:
+            cleanup_prepared(prepared)
+    print(
+        f"{len(manifest.files)} file(s), {fmt_bytes(manifest.total_size)} original, "
+        f"{fmt_bytes(manifest.total_tx)} on air after compression; profile {profile.name}."
+    )
+    print("Estimated transfer time if the link holds one mode (no retransmissions):")
+    for mode in sorted(MODES):
+        t = estimate_transfer_s(profile, sizes, mode, settings, args.encrypt, False, None, blob)
+        print(f"  mode {mode}  {MODES[mode].label:24s} {fmt_duration(t):>16s}")
+    tb = estimate_transfer_s(profile, sizes, settings.broadcast_mode, settings, args.encrypt, True, None, blob)
+    print(f"  broadcast (mode {settings.broadcast_mode}, {settings.broadcast_passes} passes) {fmt_duration(tb):>13s}")
+    print(
+        "Modes 0-1 (MFSK) are what most rooms at 1-2 m give; modes 2-5 (OFDM) need a short, quiet, "
+        "low-echo path. Real times are longer when frames must be retransmitted."
+    )
+    return 0
+
+
 def cmd_wav_encode(args: argparse.Namespace) -> int:
     """Render a broadcast transfer to WAV."""
     from ultrasonic_airdrop.transport.offline import render_broadcast, write_wav
@@ -545,6 +581,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--out", default=None, help="receiver destination (default: temp dir)")
     sp.add_argument("--max-seconds", type=float, default=6 * 3600.0, help="simulated time limit")
     sp.set_defaults(func=cmd_simulate)
+
+    sp = sub.add_parser("estimate", help="estimate transfer time for files (plays nothing)")
+    sp.add_argument("files", nargs="+")
+    sp.add_argument("--profile", default="nu", choices=sorted(PROFILES))
+    sp.add_argument("--encrypt", action="store_true")
+    sp.add_argument("--no-compress", action="store_true")
+    sp.add_argument("--passes", type=int, default=None)
+    sp.set_defaults(func=cmd_estimate)
 
     sp = sub.add_parser("wav-encode", help="render broadcast frames to a WAV file")
     sp.add_argument("files", nargs="+")

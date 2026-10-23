@@ -56,6 +56,19 @@ Launch the GUI with `airdrop-gui` or `python -m ultrasonic_airdrop`; the CLI is 
 **The app never plays sound when it starts** — audio is produced only after you press
 Send, Hardware check, Link test, or Test tone, each of which says what will be played.
 
+### Windows one-click launcher: `AirDrop.bat`
+
+Double-click **`AirDrop.bat`** in the project folder. On first run it finds Python 3.11–3.13,
+creates `.venv` and installs everything (needs internet once). It then shows a menu:
+open the GUI, **receive**, **send** (with a file picker), **estimate transfer time**,
+hardware check, link test (listen/send), list devices, switch profile (near-ultrasonic /
+audible), simulate, reinstall. You can also **drag files onto `AirDrop.bat`** to send them
+straight away. Press Ctrl+C to stop listening, then answer `N` to "Terminate batch job?" to
+return to the menu.
+
+To see how long something will take before sending: `airdrop estimate FILE...`
+(menu option 4) — it compresses/hashes the files and prints the time for every mode.
+
 ## First use (step by step)
 
 1. **On both machines: Diagnostics → Hardware self-check.** It plays 1 s of silence and
@@ -193,6 +206,7 @@ airdrop send big.bin --profile au                 # audible profile
 airdrop simulate a.bin b.txt --snr 12 --reverb 0.3 --ppm 150 --loss 0.05
 airdrop wav-encode a.bin --out sig.wav            # broadcast frames to a WAV file
 airdrop wav-decode sig.wav --out ./rx             # decode a WAV/recording
+airdrop estimate photo.jpg                        # time per mode, plays nothing
 ```
 
 `simulate` runs a complete two-endpoint transfer in-process through the channel simulator,
