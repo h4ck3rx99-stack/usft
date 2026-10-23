@@ -420,8 +420,9 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     print(f"Sender:   {'SUCCESS' if res.sender_success else 'FAILED'} — {res.sender_message}")
     print(f"Receiver: {'SUCCESS' if res.receiver_success else 'FAILED'} — {res.receiver_message}")
     print(
-        f"Simulated time {fmt_duration(res.sim_seconds)}; goodput {st['goodput_bps']:.1f} B/s (on-air bytes "
-        f"acknowledged / elapsed); frames sent {st['frames_sent']:.0f}; retransmitted units "
+        f"Transfer time {fmt_duration(st['elapsed_s'])} (simulated); goodput {st['goodput_bps']:.1f} B/s (on-air bytes "
+        f"acknowledged / elapsed; {st['data_phase_goodput_bps']:.1f} B/s during the data phase); "
+        f"frames sent {st['frames_sent']:.0f}; retransmitted units "
         f"{st['retransmitted_units']:.0f}; data-frame loss rate {st['frame_loss_rate']:.1%}; final mode "
         f"{st['mode']:.0f}.  (SIMULATION — not a hardware measurement.)"
     )

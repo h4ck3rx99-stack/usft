@@ -152,6 +152,8 @@ class SenderSession:
         self._windows_total = 0
         self.hold_until = 0.0
         self.polls_total = 0
+        self.data_start: float | None = None
+        self.end_time: float | None = None
         self.mode_history: list[int] = []
         self._frames_total = 0
         self._frames_lost = 0
@@ -186,12 +188,15 @@ class SenderSession:
         self.events(StateEvent(self.role, self.state.value, label + (f" ({detail})" if detail else "")))
 
     def _set_state(self, state: SenderState, detail: str = "") -> None:
+        if state == SenderState.DATA and self.data_start is None:
+            self.data_start = self.radio.now()
         if state != self.state:
             log.info(kv("sender state", old=self.state.value, new=state.value, detail=detail))
         self.state = state
         self._emit_state(detail)
 
     def _finish(self, state: SenderState, message: str) -> None:
+        self.end_time = self.radio.now()
         self.message = message
         self.deadline = None
         self._set_state(state, message)
@@ -211,8 +216,9 @@ class SenderSession:
         )
 
     def stats(self) -> dict[str, float]:
-        """Summary statistics."""
-        elapsed = max(1e-9, self.radio.now() - self.start_time)
+        """Summary statistics (frozen at the moment the session ended)."""
+        now = self.end_time if self.end_time is not None else self.radio.now()
+        elapsed = max(1e-9, now - self.start_time)
         return {
             "elapsed_s": elapsed,
             "acked_bytes": float(self.units.acked_bytes()),
@@ -223,6 +229,9 @@ class SenderSession:
             "frame_loss_rate": self._frames_lost / self._frames_total if self._frames_total else 0.0,
             "mode": float(self.rate.mode),
             "polls": float(self.polls_total),
+            "data_phase_goodput_bps": (
+                self.units.acked_bytes() / max(1e-9, now - self.data_start) if self.data_start is not None else 0.0
+            ),
         }
 
     def _progress(self) -> None:

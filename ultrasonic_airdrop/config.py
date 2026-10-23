@@ -239,21 +239,23 @@ def get_mode(mode_id: int) -> ModeSpec:
 # --------------------------------------------------------------------------------------
 # SNR thresholds for mode selection.
 #
-# Units: the receiver's *estimator* outputs, i.e. MFSK per-tone bin SNR (modes 0/1)
-# and mean per-carrier SNR over the enabled carriers (OFDM modes 2–5).  Values are
-# the SNR at which the simulated frame error rate is ~1 % on an AWGN channel with a
-# 150 ppm clock offset; see tools/snr_curves.py and docs/SNR_CURVES.md for the raw
-# sweep output these were read from.  Mode selection additionally requires
-# MODE_SNR_MARGIN_DB of headroom.
+# Units: the receiver's *estimator* outputs — MFSK per-tone bin SNR for modes 0/1
+# and mean per-carrier SNR over the enabled carriers for OFDM modes 2–5 (probe
+# measurement or differential-EVM estimate, which agree within ~0.5 dB).
+# Derived from docs/SNR_CURVES.md (tools/snr_curves.py: 50 frames per point,
+# 1 dB steps, AWGN + 150 ppm): the lowest selection-metric SNR at which the
+# frame error rate is <= 2 % at that and every stronger point, rounded up to
+# 0.5 dB.  On the 1 dB grid C0 and C1 OFDM curves coincide, so the C1 entries
+# are nudged 0.5 dB above C0.  Mode selection adds MODE_SNR_MARGIN_DB on top.
 # --------------------------------------------------------------------------------------
 
 REQUIRED_SNR_DB: Final[dict[int, float]] = {
-    0: 9.0,
-    1: 11.0,
-    2: 8.0,
-    3: 10.0,
-    4: 13.0,
-    5: 15.0,
+    0: 10.5,
+    1: 11.5,
+    2: 7.5,
+    3: 8.0,
+    4: 10.5,
+    5: 12.5,
 }
 MODE_SNR_MARGIN_DB: Final = 3.0
 #: An OFDM carrier is enabled only if its SNR is at least this far above the

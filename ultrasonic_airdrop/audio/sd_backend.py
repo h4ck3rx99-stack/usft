@@ -97,18 +97,6 @@ class SoundDeviceBackend:
             log.warning(kv("WASAPI exclusive settings unavailable; using shared mode", error=exc))
             return None
 
-    def _channels_for(self, device: int | None, kind: str) -> int:
-        try:
-            devs = list_devices()
-            sd = load_sounddevice()
-            idx = device if device is not None else sd.default.device[0 if kind == "input" else 1]
-            if idx is None or idx < 0:
-                return 1
-            maxc = devs[idx].max_input_channels if kind == "input" else devs[idx].max_output_channels
-            return 1 if maxc >= 1 else 0
-        except Exception:
-            return 1
-
     def _in_cb(self, indata: Any, frames: int, time_info: Any, status: Any) -> None:
         if status:
             self.status_flags += 1
