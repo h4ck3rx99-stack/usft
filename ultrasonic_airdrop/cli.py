@@ -305,6 +305,7 @@ def cmd_send(args: argparse.Namespace) -> int:
         options.passphrase = _passphrase(args, confirm=True)
     profile = get_profile(args.profile)
     with tempfile.TemporaryDirectory(prefix="airdrop-") as tmp:
+        paths = _maybe_shrink(paths, args, Path(tmp))
         print("Preparing files (hashing/compressing)…", flush=True)
         manifest, prepared = prepare_files(paths, options.compression, Path(tmp))
         try:
@@ -403,7 +404,7 @@ def cmd_simulate(args: argparse.Namespace) -> int:
         compression=not args.no_compress,
         fixed_mode=args.mode,
     )
-    paths = [Path(p) for p in args.files]
+    paths = _maybe_shrink([Path(p) for p in args.files], args, Path(tempfile.mkdtemp(prefix="airdrop-sim-src-")))
     out = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="airdrop-sim-out-"))
     print(
         f"Simulating transfer of {len(paths)} file(s) (SNR {args.snr} dB, {args.ppm:+g} ppm, RT60 {args.reverb} s, "
@@ -440,6 +441,21 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     return 0 if ok and res.receiver_success else 1
 
 
+def _maybe_shrink(paths: list[Path], args: argparse.Namespace, tmp: Path) -> list[Path]:
+    """Replace large photos by shrunken JPEG copies when ``--shrink-images`` is given."""
+    if not getattr(args, "shrink_images", False):
+        return paths
+    from ultrasonic_airdrop.files.imageshrink import shrink_images
+
+    target = int(args.shrink_kb * 1024)
+    out: list[Path] = []
+    for r in shrink_images(paths, tmp / "shrunk", target):
+        if r.shrunk:
+            print(f"Shrunk {r.source.name}: {fmt_bytes(r.original_bytes)} → {fmt_bytes(r.new_bytes)} ({r.output.name})")
+        out.append(r.output)
+    return out
+
+
 def cmd_estimate(args: argparse.Namespace) -> int:
     """Print the airtime estimate for files in every mode (plays nothing)."""
     from ultrasonic_airdrop.files.chunker import cleanup_prepared, prepare_files
@@ -449,7 +465,8 @@ def cmd_estimate(args: argparse.Namespace) -> int:
     profile = get_profile(args.profile)
     with tempfile.TemporaryDirectory(prefix="airdrop-est-") as tmp:
         print("Preparing files (hashing/compressing)…", flush=True)
-        manifest, prepared = prepare_files([Path(p) for p in args.files], not args.no_compress, Path(tmp))
+        paths = _maybe_shrink([Path(p) for p in args.files], args, Path(tmp))
+        manifest, prepared = prepare_files(paths, not args.no_compress, Path(tmp))
         try:
             sizes = [f.tx_size for f in manifest.files]
             blob = len(manifest.to_blob())
@@ -544,6 +561,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-compress", action="store_true")
     sp.add_argument("--mode", type=int, choices=sorted(MODES), default=None, help="fixed link mode")
     sp.add_argument("--name", default="Ultrasonic AirDrop", help="sender display name")
+    sp.add_argument("--shrink-images", action="store_true", help="send large photos as smaller JPEG copies")
+    sp.add_argument("--shrink-kb", type=float, default=900.0, help="target size per photo for --shrink-images")
     sp.add_argument("-y", "--yes", action="store_true", help="do not ask for confirmation")
     audio_opts(sp)
     sp.set_defaults(func=cmd_send)
@@ -580,10 +599,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--seed", type=int, default=1)
     sp.add_argument("--out", default=None, help="receiver destination (default: temp dir)")
     sp.add_argument("--max-seconds", type=float, default=6 * 3600.0, help="simulated time limit")
+    sp.add_argument("--shrink-images", action="store_true", help="send large photos as smaller JPEG copies")
+    sp.add_argument("--shrink-kb", type=float, default=900.0, help="target size per photo for --shrink-images")
     sp.set_defaults(func=cmd_simulate)
 
     sp = sub.add_parser("estimate", help="estimate transfer time for files (plays nothing)")
     sp.add_argument("files", nargs="+")
+    sp.add_argument("--shrink-images", action="store_true", help="send large photos as smaller JPEG copies")
+    sp.add_argument("--shrink-kb", type=float, default=900.0, help="target size per photo for --shrink-images")
     sp.add_argument("--profile", default="nu", choices=sorted(PROFILES))
     sp.add_argument("--encrypt", action="store_true")
     sp.add_argument("--no-compress", action="store_true")

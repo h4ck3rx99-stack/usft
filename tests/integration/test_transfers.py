@@ -336,11 +336,12 @@ def test_broadcast_with_loss_then_second_pass_completes(tmp_path, make_file, rng
     f1 = make_file("b1.bin", rng.integers(0, 256, 700, dtype=np.uint8).tobytes())
     f2 = make_file("b2.txt", b"broadcast me " * 20)
     dest = tmp_path / "dest"
-    settings = FAST.replace(broadcast_passes=1, rx_inactivity_s=15.0)
+    settings = FAST.replace(broadcast_passes=1, rx_inactivity_s=30.0)
     opts = TransferOptions(broadcast=True, compression=False)
     first = run_transfer([f1, f2], dest, settings, opts, ch(15, 80, 30, loss=0.35), ch(15, 0, 31), seed=31)
     assert first.sender_success  # broadcast finished transmitting
     assert not first.receiver_success  # but frames were lost
+    assert first.receiver.sess.reassembly is not None  # precondition: the manifest got through
     verified_first = {n for n, st, _ in first.receiver.results if st == "OK"}
     assert verified_first != {"b1.bin", "b2.txt"}
     second = run_transfer([f1, f2], dest, settings, opts, ch(15, 80, 32, loss=0.0), ch(15, 0, 33), seed=32)
@@ -348,7 +349,7 @@ def test_broadcast_with_loss_then_second_pass_completes(tmp_path, make_file, rng
     for src in (f1, f2):
         assert sha(dest / src.name) == sha(src)
     resumed = sum(a.resumed_units for a in second.receiver.sess.reassembly.unique())
-    assert resumed > 0 or verified_first
+    assert resumed > 0  # the second broadcast continued from the first one's partial data
 
 
 def test_encryption_roundtrip(tmp_path, make_file, rng):
@@ -392,3 +393,20 @@ def test_existing_destination_file_not_overwritten(tmp_path, make_file, rng):
     assert res.receiver_success
     assert (dest / "report.txt").read_bytes() == b"precious original"
     assert sha(dest / "report (1).txt") == sha(f)
+
+
+def test_fast_profile_transfer(tmp_path, make_file, rng):
+    f = make_file("fast.bin", rng.integers(0, 256, 60_000, dtype=np.uint8).tobytes())
+    dest = tmp_path / "dest"
+    res = run_transfer(
+        [f],
+        dest,
+        FAST,
+        TransferOptions(profile_key="fa", compression=False),
+        ch(32, 150, 40),
+        ch(32, -150, 41),
+        seed=40,
+    )
+    assert res.sender_success and res.receiver_success, (res.sender_message, res.receiver_message)
+    assert sha(dest / "fast.bin") == sha(f)
+    assert res.sender_stats["data_phase_goodput_bps"] > 1000

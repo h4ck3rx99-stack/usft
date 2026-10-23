@@ -101,7 +101,7 @@ INV_GRAY = np.argsort(GRAY).astype(np.int64)
 def numerology(profile: Profile) -> Numerology:
     """Return (cached) numerology for ``profile``."""
     scale = profile.sample_rate / 48_000
-    taper = round(SYMBOL_TAPER_48K * scale)
+    taper = profile.taper or round(SYMBOL_TAPER_48K * scale)
     fft_offset = round(profile.guard * FFT_OFFSET_FRACTION)
     ofdm_offset = round(profile.guard * OFDM_FFT_OFFSET_FRACTION)
     for off in (fft_offset, ofdm_offset):

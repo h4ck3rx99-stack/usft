@@ -111,6 +111,13 @@ Windows audio processing is the most common reason the near-ultrasonic band fail
 | Near-ultrasonic (default) | chirps 17–20 kHz, data 17.5–19.9 kHz | 48 kHz | Most laptops whose hardware check passes |
 | Audible compatibility | 2.5–5.5 kHz | 48 kHz | Hardware that fails near-ultrasonic; audible |
 | Ultrasonic (experimental) | 20.5–23.5 kHz | 96 kHz | Only if the 96 kHz hardware check passes (enabled in the GUI after a passing check) |
+| **Fast close-range** (`fa`) | 1.5–20.6 kHz, 375 Hz carrier spacing, 4 ms symbols | 48 kHz | Laptops **side by side** (~10–30 cm). Loudly audible hiss. ~2 KB/s simulated: **1 MB in ~8 min** |
+
+The fast profile spreads the same 52 carriers over ~19 kHz with 6.7× the symbol rate. Its 1.3 ms
+guard interval only tolerates a strong direct path, so use it with the laptops next to each other
+(sender's speakers facing the receiver's microphone); at room distances the probe falls back to
+its MFSK modes. The receiver listens for all 48 kHz profiles at once, so nothing needs to be
+selected on the receiving side.
 
 Theory vs practice: a 48 kHz stream can represent up to 24 kHz, but DAC/ADC
 anti-aliasing filters roll off around 20–22 kHz, laptop micro-speakers typically fall off
@@ -207,6 +214,7 @@ airdrop simulate a.bin b.txt --snr 12 --reverb 0.3 --ppm 150 --loss 0.05
 airdrop wav-encode a.bin --out sig.wav            # broadcast frames to a WAV file
 airdrop wav-decode sig.wav --out ./rx             # decode a WAV/recording
 airdrop estimate photo.jpg                        # time per mode, plays nothing
+airdrop send photo.jpg --profile fa --shrink-images   # fast, side by side; photo re-encoded to ~0.9 MB
 ```
 
 `simulate` runs a complete two-endpoint transfer in-process through the channel simulator,
@@ -309,6 +317,6 @@ tests/                unit/, sim/, integration/
 Tested on Python 3.13.16 (Linux x86_64) with numpy 2.5.4, scipy 1.18.1, sounddevice 0.5.6
 (PortAudio 19.6), reedsolo 1.7.0 (pure Python; `creedsolo` is used automatically if
 installed), cryptography 50.0.2, PySide6 6.12.0, pytest 9.1.1, pytest-timeout 2.4.0,
-ruff 0.17.2, mypy 2.4.0. The full environment is pinned in `requirements.lock.txt`;
+ruff 0.17.2, mypy 2.4.0, Pillow 12.3.0 (optional photo shrinking). The full environment is pinned in `requirements.lock.txt`;
 `pyproject.toml` declares compatible ranges. Python 3.11/3.12 and Windows were not tested
 in this environment.

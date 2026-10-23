@@ -24,22 +24,26 @@ goto :send_with_files
 cls
 echo ============================================================
 echo   Ultrasonic AirDrop          profile: %PROFILE%
-echo   (nu = near-ultrasonic 17.5-20 kHz, au = audible 3-5 kHz)
+echo   nu = near-ultrasonic 17.5-20 kHz, quiet, any distance up to ~1-2 m
+echo   fa = FAST, laptops side by side, loud hiss  ~2 KB/s (1 MB in ~8-9 min)
+echo   au = audible 3-5 kHz, for hardware that fails near-ultrasonic
 echo ============================================================
 echo    1  Open the app (GUI)
-echo    2  RECEIVE files
-echo    3  SEND files
+echo    2  RECEIVE files (listens for every profile at once)
+echo    3  SEND files with the current profile
+echo    F  FAST SEND - laptops side by side (profile fa, shrinks photos)
 echo    4  Estimate transfer time for files (plays nothing)
 echo    5  Hardware self-check (plays test sweeps)
 echo    6  Link test - this PC LISTENS
 echo    7  Link test - this PC SENDS probes
 echo    8  List audio devices
-echo    9  Switch profile (nu / au)
+echo    9  Switch profile (nu - fa - au)
 echo    S  Simulate a transfer (no sound, tests the software only)
 echo    U  Update / reinstall
 echo    Q  Quit
 echo.
-choice /c 123456789SUQ /n /m "Choose: "
+choice /c 123456789SUQF /n /m "Choose: "
+if errorlevel 13 goto :fast_send
 if errorlevel 12 goto :eof
 if errorlevel 11 goto :reinstall
 if errorlevel 10 goto :simulate
@@ -81,6 +85,14 @@ if errorlevel 2 goto :pause_menu
 if exist "%RECV_DIR%" explorer "%RECV_DIR%"
 goto :pause_menu
 
+:fast_send
+set "PROFILE=fa"
+echo.
+echo FAST mode: put the two laptops side by side, the sender's speakers facing the
+echo receiver's microphone (usually at the top, next to the webcam). It is LOUD.
+echo The receiving laptop just needs option 2 (RECEIVE) running.
+goto :send
+
 :send
 call :pick_files
 if not defined FILES (
@@ -97,13 +109,16 @@ set "MODEOPT="
 set "ENCOPT="
 choice /c 12 /n /m "Transfer mode: "
 if errorlevel 2 set "MODEOPT=--broadcast"
+set "SHRINKOPT="
+choice /c YN /n /m "Shrink large photos to about 0.9 MB first (much faster)? [Y/N] "
+if not errorlevel 2 set "SHRINKOPT=--shrink-images"
 choice /c YN /n /m "Encrypt with a shared passphrase? [Y/N] "
 if errorlevel 2 goto :send_run
 set "ENCOPT=--encrypt"
 :send_run
 echo.
 echo The estimate is shown next; answer y to start playing sound.
-"%PY%" -m ultrasonic_airdrop.cli send %FILES% --profile %PROFILE% %MODEOPT% %ENCOPT% --name "%COMPUTERNAME%"
+"%PY%" -m ultrasonic_airdrop.cli send %FILES% --profile %PROFILE% %MODEOPT% %ENCOPT% %SHRINKOPT% --name "%COMPUTERNAME%"
 goto :pause_menu
 
 :estimate
@@ -112,7 +127,11 @@ if not defined FILES (
     echo No files selected.
     goto :pause_menu
 )
+echo --- as is, profile %PROFILE% ---
 "%PY%" -m ultrasonic_airdrop.cli --log-level WARNING estimate %FILES% --profile %PROFILE%
+echo.
+echo --- FAST profile (fa) with photos shrunk to ~0.9 MB ---
+"%PY%" -m ultrasonic_airdrop.cli --log-level WARNING estimate %FILES% --profile fa --shrink-images
 goto :pause_menu
 
 :check
@@ -140,7 +159,10 @@ goto :pause_menu
 goto :pause_menu
 
 :toggle_profile
-if "%PROFILE%"=="nu" (set "PROFILE=au") else (set "PROFILE=nu")
+if "%PROFILE%"=="au" set "PROFILE=x"
+if "%PROFILE%"=="fa" set "PROFILE=au"
+if "%PROFILE%"=="nu" set "PROFILE=fa"
+if "%PROFILE%"=="x" set "PROFILE=nu"
 goto :menu
 
 :simulate

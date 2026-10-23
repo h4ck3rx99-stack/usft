@@ -24,6 +24,8 @@ def make_file(tmp_path: Path):
     def _make(name: str, data: bytes) -> Path:
         p = src / name
         p.write_bytes(data)
+        # The manifest carries mtime; pin it so simulated transfers are reproducible.
+        os.utime(p, (1_700_000_000, 1_700_000_000))
         return p
 
     return _make

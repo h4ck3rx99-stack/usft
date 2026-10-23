@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ultrasonic_airdrop.config import PROBE_MODE_ID, PROFILE_AU, PROFILE_NU, PROFILE_US
+from ultrasonic_airdrop.config import PROBE_MODE_ID, PROFILE_AU, PROFILE_FA, PROFILE_NU, PROFILE_US
 from ultrasonic_airdrop.link.codec import FrameCodec, body_layout, frame_airtime, max_body_len
 from ultrasonic_airdrop.link.receiver_pipeline import ReceiverPipeline
 from ultrasonic_airdrop.phy import mfsk, ofdm
@@ -165,7 +165,7 @@ def test_frequency_shift_and_resample_sanity():
     assert len(resample_by_ratio(x, 1.0001)) == round(len(x) / 1.0001)
 
 
-@pytest.mark.parametrize("profile", [PROFILE_NU, PROFILE_AU, PROFILE_US], ids=lambda p: p.key)
+@pytest.mark.parametrize("profile", [PROFILE_NU, PROFILE_AU, PROFILE_US, PROFILE_FA], ids=lambda p: p.key)
 @pytest.mark.parametrize("mode", [0, 1, 2, 3, 4, 5, PROBE_MODE_ID])
 def test_codec_pipeline_roundtrip(profile, mode, rng):
     codec = FrameCodec(profile, -6)
@@ -203,3 +203,11 @@ def test_half_duplex_mute_suppresses_detection(rng):
     pl.add_mute(9000, 10000 + len(sig) + 100)
     pl.feed(x)
     assert pl.process() == []
+
+
+def test_fast_profile_numerology():
+    num = numerology(PROFILE_FA)
+    assert PROFILE_FA.bin_hz == pytest.approx(375.0)
+    assert num.sym_len == 192 and PROFILE_FA.symbol_rate == pytest.approx(250.0)
+    assert num.ofdm_bins[0] * 375 == 1500 and num.ofdm_bins[-1] * 375 == 20625
+    assert num.taper == 16 and num.fft_offset >= num.taper

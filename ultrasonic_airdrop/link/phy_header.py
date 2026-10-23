@@ -14,7 +14,7 @@ from ultrasonic_airdrop.fec.rs import rs_decode, rs_encode
 from ultrasonic_airdrop.phy.numerology import BoolArray, FloatArray
 
 _FMT = "<BBH"
-MAX_BODY_LEN = 4096
+MAX_BODY_LEN = 16384
 
 
 @dataclass(frozen=True)

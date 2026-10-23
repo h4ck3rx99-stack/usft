@@ -9,6 +9,7 @@ mypy_extensions==1.1.0
 numpy==2.5.4
 packaging==26.3
 pathspec==1.1.1
+pillow==12.3.0
 pluggy==1.7.0
 pycparser==3.12
 Pygments==2.21.0

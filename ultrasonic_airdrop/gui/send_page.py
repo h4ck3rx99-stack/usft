@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from ultrasonic_airdrop.config import MODES, PROFILES, TransferOptions, get_profile
 from ultrasonic_airdrop.files.chunker import PreparedFile, cleanup_prepared, prepare_files
+from ultrasonic_airdrop.files.imageshrink import pillow_available, shrink_images
 from ultrasonic_airdrop.files.manifest import Manifest
 from ultrasonic_airdrop.gui.context import AppContext
 from ultrasonic_airdrop.gui.widgets.file_list import FileList, human_size
@@ -119,6 +120,10 @@ class SendPage(QWidget):
         self.compress = QCheckBox("Compress files when it saves ≥ 5 %")
         self.compress.setChecked(True)
         form.addRow("Compression:", self.compress)
+        self.shrink = QCheckBox("Shrink photos to about 0.9 MB before sending (sound is slow; strips photo metadata)")
+        self.shrink.setChecked(pillow_available())
+        self.shrink.setEnabled(pillow_available())
+        form.addRow("Photos:", self.shrink)
         lvl = QHBoxLayout()
         self.level = QSlider(Qt.Orientation.Horizontal)
         self.level.setRange(-20, -3)
@@ -198,9 +203,19 @@ class SendPage(QWidget):
     def _busy(self, busy: bool) -> None:
         self.send_btn.setEnabled(not busy)
         self.cancel_btn.setEnabled(busy)
-        for w in (self.interactive, self.broadcast, self.profile, self.encrypt, self.compress, self.level, self.name):
+        for w in (
+            self.interactive,
+            self.broadcast,
+            self.profile,
+            self.encrypt,
+            self.compress,
+            self.level,
+            self.name,
+            self.shrink,
+        ):
             w.setEnabled(not busy)
         self.passphrase.setEnabled(not busy and self.encrypt.isChecked())
+        self.shrink.setEnabled(not busy and pillow_available())
 
     # ---------------------------------------------------------------- start
     def _start(self) -> None:
@@ -215,11 +230,15 @@ class SendPage(QWidget):
         self._busy(True)
         self.state.setText("Preparing files (hashing/compressing)…")
         compress = self.compress.isChecked()
+        shrink = self.shrink.isChecked()
         self._tmp = tempfile.TemporaryDirectory(prefix="airdrop-send-")
         tmpdir = Path(self._tmp.name)
 
         def work(_t: TaskThread):
-            return prepare_files(paths, compress, tmpdir)
+            send_paths = paths
+            if shrink:
+                send_paths = [r.output for r in shrink_images(paths, tmpdir / "shrunk")]
+            return prepare_files(send_paths, compress, tmpdir)
 
         self.prep = TaskThread(work, self)
         self.prep.done.connect(self._prepared_ok)
@@ -271,7 +290,12 @@ class SendPage(QWidget):
             + (f"; ≈ {fmt_duration(est_fast)} if the link supports the fastest OFDM mode" if est_fast else "")
             + ".<br>Actual time depends on link quality and retransmissions.<br><br>"
             f"This computer will now play <b>{profile.name}</b> sound at up to <b>{settings.tx_level_dbfs:.0f} dBFS</b>"
-            " through the selected speaker. Children and pets may hear it."
+            " through the selected speaker. "
+            + (
+                "<b>This profile is loudly audible</b> (a constant hiss) for the whole transfer."
+                if profile.audible
+                else "Children and pets may hear it."
+            )
         )
         box = QMessageBox(
             QMessageBox.Icon.Question,

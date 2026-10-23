@@ -151,3 +151,13 @@ def test_rir_shape():
 
 def test_full_mask_is_default():
     assert CarrierMask.all().mask_id == 0
+
+
+@pytest.mark.parametrize("mode", [1, 3, 5])
+def test_fast_profile_side_by_side(mode):
+    """Fast close-range profile: high SNR, short delay spread (strong direct path), clock offset."""
+    from ultrasonic_airdrop.config import PROFILE_FA
+
+    cfg = ChannelConfig(snr_db=32, ppm=150, rt60_s=0.3, drr_db=15, seed=21)
+    out = run_frames(PROFILE_FA, mode, 3, cfg, seed=21)
+    assert out.wrong == 0 and out.correct == 3

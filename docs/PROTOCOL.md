@@ -14,25 +14,26 @@ All multi-byte integers are **little-endian**. "LE u16" = unsigned 16-bit little
 
 ### 1.1 Profiles
 
-| | Near-ultrasonic `nu` (default) | Audible `au` | Ultrasonic experimental `us` |
-|---|---|---|---|
-| Sample rate *fs* | 48 000 Hz | 48 000 Hz | 96 000 Hz |
-| FFT size *N* | 1024 | 1024 | 2048 |
-| Bin spacing | 46.875 Hz | 46.875 Hz | 46.875 Hz |
-| Guard *G* | 256 | 256 | 512 |
-| Symbol length *L = N + G* | 1280 (26.667 ms) | 1280 | 2560 (26.667 ms) |
-| Chirp band | 17.0–20.0 kHz | 2.5–5.5 kHz | 20.5–23.5 kHz |
-| Chirp length *C* | 2048 | 2048 | 4096 (same 42.7 ms) |
-| MFSK subband A bins | 376–391 | 64–79 | 448–463 |
-| MFSK subband B bins | 400–415 | 88–103 | 472–487 |
-| OFDM candidate bins | 374–425 (52) | 60–111 (52) | 444–495 (52) |
+| | Near-ultrasonic `nu` (default) | Audible `au` | Ultrasonic experimental `us` | Fast close-range `fa` |
+|---|---|---|---|---|
+| Sample rate *fs* | 48 000 Hz | 48 000 Hz | 96 000 Hz | 48 000 Hz |
+| FFT size *N* | 1024 | 1024 | 2048 | 128 |
+| Bin spacing | 46.875 Hz | 46.875 Hz | 46.875 Hz | 375 Hz |
+| Guard *G* | 256 | 256 | 512 | 64 |
+| Symbol length *L = N + G* | 1280 (26.667 ms) | 1280 | 2560 (26.667 ms) | 192 (4 ms) |
+| Taper *T* | 64 | 64 | 128 | 16 |
+| Chirp band | 17.0–20.0 kHz | 2.5–5.5 kHz | 20.5–23.5 kHz | 1.5–20.5 kHz |
+| Chirp length *C* | 2048 | 2048 | 4096 (same 42.7 ms) | 2048 |
+| MFSK subband A bins | 376–391 | 64–79 | 448–463 | 8–23 |
+| MFSK subband B bins | 400–415 | 88–103 | 472–487 | 28–43 |
+| OFDM candidate bins | 374–425 (52) | 60–111 (52) | 444–495 (52) | 4–55 (52) |
 
 A frequency "bin *k*" means *k · fs / N* Hz. All tones and carriers sit exactly
 on bin centres. The `us` chirp length is 4096 samples (not 2048) so that its
 duration equals the 48 kHz profiles'.
 
 Derived constants used below (values for 48 kHz; scale by *fs*/48000 for `us`):
-taper *T* = 64 samples, ramp = 5 ms (240 samples), chirp-pair tolerance = 64 samples,
+taper *T* as in the table, ramp = 5 ms (240 samples), chirp-pair tolerance = 64 samples,
 probe silence = 0.25 s (12 000 samples).
 
 ### 1.2 Burst layout
@@ -308,6 +309,8 @@ profile without encryption:
 | 5 | 44 | 4.59 s | 4 | 307 B/s |
 
 Frames per window = min(W, ⌊20 s / frame airtime⌋), W = 6 (MFSK) or 8 (OFDM).
+For the `fa` profile modes 4 and 5 hit the 255-unit (8160-byte) DATA limit at 4.1 s / 3.6 s
+per frame (≈2.0 / 2.3 KB/s raw).
 
 ## 7. Interactive session (half-duplex ARQ)
 

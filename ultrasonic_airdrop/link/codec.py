@@ -24,7 +24,7 @@ from ultrasonic_airdrop.config import (
     get_mode,
 )
 from ultrasonic_airdrop.fec.rs import coded_length, encode_body
-from ultrasonic_airdrop.link.phy_header import PhyHeader
+from ultrasonic_airdrop.link.phy_header import MAX_BODY_LEN, PhyHeader
 from ultrasonic_airdrop.phy import mfsk, ofdm
 from ultrasonic_airdrop.phy.chirp import chirp
 from ultrasonic_airdrop.phy.numerology import FloatArray, Numerology, numerology
@@ -77,7 +77,7 @@ def frame_airtime(profile: Profile, mode_id: int, body_len: int, n_enabled: int 
 
 def max_body_len(profile: Profile, mode_id: int, max_airtime_s: float, n_enabled: int | None = None) -> int:
     """Largest body length whose frame airtime stays within ``max_airtime_s`` (0 if none)."""
-    lo, hi = 0, 4096
+    lo, hi = 0, MAX_BODY_LEN
     while lo < hi:
         mid = (lo + hi + 1) // 2
         if frame_airtime(profile, mode_id, mid, n_enabled) <= max_airtime_s:

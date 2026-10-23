@@ -40,7 +40,7 @@ from ultrasonic_airdrop.fec.crc import crc32
 HEADER_LEN = 14
 CRC_LEN = 4
 OVERHEAD = HEADER_LEN + CRC_LEN
-MAX_PAYLOAD = 4000
+MAX_PAYLOAD = 16000
 
 FLAG_DIR = 0x01
 FLAG_ENC = 0x02

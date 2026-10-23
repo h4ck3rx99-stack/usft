@@ -37,6 +37,10 @@ class Profile:
     ofdm_first_bin: int
     ofdm_last_bin: int
     experimental: bool = False
+    #: Symbol cross-fade length in samples (0 = 64 samples scaled to the sample rate).
+    taper: int = 0
+    #: True for profiles that are loudly audible (shown as a warning before transmitting).
+    audible: bool = False
 
     @property
     def symbol_len(self) -> int:
@@ -97,6 +101,7 @@ PROFILE_AU: Final = Profile(
     mfsk_b_start=88,
     ofdm_first_bin=60,
     ofdm_last_bin=111,
+    audible=True,
 )
 
 PROFILE_US: Final = Profile(
@@ -116,7 +121,28 @@ PROFILE_US: Final = Profile(
     experimental=True,
 )
 
-PROFILES: Final[dict[str, Profile]] = {p.key: p for p in (PROFILE_NU, PROFILE_AU, PROFILE_US)}
+PROFILE_FA: Final = Profile(
+    key="fa",
+    name="Fast close-range, audible (1.5–20.6 kHz)",
+    sample_rate=48_000,
+    # 375 Hz carrier spacing: the same 52 carriers spread over ~19 kHz with 4 ms
+    # symbols (250 symbols/s), ~6.7x the symbol rate of the other profiles.  Meant for
+    # laptops placed side by side (short delay spread, high SNR); the 1.3 ms guard
+    # does not tolerate room reverberation at larger distances.
+    n_fft=128,
+    guard=64,
+    chirp_f0=1_500.0,
+    chirp_f1=20_500.0,
+    chirp_len=2048,
+    mfsk_a_start=8,
+    mfsk_b_start=28,
+    ofdm_first_bin=4,
+    ofdm_last_bin=55,
+    taper=16,
+    audible=True,
+)
+
+PROFILES: Final[dict[str, Profile]] = {p.key: p for p in (PROFILE_NU, PROFILE_AU, PROFILE_US, PROFILE_FA)}
 
 
 def get_profile(key: str) -> Profile:
