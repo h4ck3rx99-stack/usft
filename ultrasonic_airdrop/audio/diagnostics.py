@@ -186,7 +186,7 @@ def analyze_hardware_check(
     actual_rate: float | None = None,
 ) -> HardwareCheckResult:
     """Analyse sweep recordings (one per level) and a silence recording."""
-    centers = np.geomspace(1000.0, f1, 160)
+    centers = np.geomspace(1000.0, f1 * 0.99, 160)
     responses = []
     offsets = []
     for sw, rec in zip(sweeps, recordings, strict=True):
@@ -202,6 +202,7 @@ def analyze_hardware_check(
     fn, pn = welch(noise, fs, nperseg=4096)
     _fsw, psw = welch(sw, fs, nperseg=4096)
     noise_rel = _smooth_db(fn, pn / (psw + 1e-20), centers) - ref
+    noise_rel[centers < SWEEP_F0 * 1.1] = np.nan  # the sweep has no energy there
     noise_dbfs = float(10 * np.log10(np.mean(noise**2) + 1e-20))
     peak = max(float(np.max(np.abs(r))) for r in recordings) if recordings else 0.0
     clipping = peak >= 0.99
@@ -214,16 +215,24 @@ def analyze_hardware_check(
         sel = (centers >= lo) & (centers <= hi)
         rel = float(np.nanmean(resp[sel])) if sel.any() else float("nan")
         snr = _band_snr(recordings[-1], offsets[-1], noise, fs, SWEEP_F0, f1, (lo, hi), len(sw) / fs)
+        # Fraction of the band that is usable: a dead upper half (low-pass inside the band) must
+        # not be averaged away by a strong lower half.
+        good = float(np.mean(resp[sel] >= -20.0)) if sel.any() else 0.0
+        fair = float(np.mean(resp[sel] >= -30.0)) if sel.any() else 0.0
         if np.isnan(rel) or np.isnan(snr):
             verdict = "not supported"
-        elif snr >= 25 and rel >= -25:
+        elif snr >= 25 and good >= 0.8:
             verdict = "supported"
-        elif snr >= 12 and rel >= -40:
+        elif snr >= 12 and fair >= 0.5:
             verdict = "marginal"
         else:
             verdict = "not supported"
         bands.append(BandVerdict(p.key, (lo, hi), rel, snr, verdict))
     wall = _brick_wall(centers, resp, noise_rel)
+    if wall is not None:
+        for b in bands:
+            if b.verdict == "supported" and wall < b.band_hz[1] - 300:
+                b.verdict = "marginal"  # a filter edge inside/below the band costs carriers
     level_indep: bool | None = None
     if wall is not None and len(responses) >= 2:
         r0 = responses[0] - np.nanmean(responses[0][ref_sel])

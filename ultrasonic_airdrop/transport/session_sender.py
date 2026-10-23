@@ -148,6 +148,7 @@ class SenderSession:
         self._part_tracker: PartTracker | None = None
         self._broadcast_iter: Iterator[list[OutFrame]] | None = None
         self._cancel_requested = False
+        self._cancel_reason: str | None = None
         self._windows_total = 0
         self.hold_until = 0.0
         self.polls_total = 0
@@ -262,6 +263,10 @@ class SenderSession:
         return estimate.ack_airtime(self.profile, self.io.cipher is not None)
 
     # ------------------------------------------------------------------ control API
+    def request_cancel(self, reason: str = "Cancelled by sender") -> None:
+        """Thread-safe cancel request (applied on the engine thread at the next tick)."""
+        self._cancel_reason = reason
+
     def cancel(self, reason: str = "Cancelled by sender") -> None:
         """User cancel: send CANCEL twice and stop."""
         if self.done:
@@ -274,6 +279,10 @@ class SenderSession:
     # ------------------------------------------------------------------ main loop
     def tick(self, now: float) -> None:
         """Advance the state machine."""
+        if self._cancel_reason is not None and not self.done:
+            reason, self._cancel_reason = self._cancel_reason, None
+            self.cancel(reason)
+            return
         if self.done or self.radio.tx_busy():
             return
         if now < self.hold_until:

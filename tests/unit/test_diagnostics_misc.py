@@ -84,3 +84,12 @@ def test_estimates_are_sane():
     assert t_big > 60 * 60  # 100 KB at robust MFSK takes over an hour
     assert estimate_transfer_s(PROFILE_NU, [100_000], 5, s) < t_big / 4
     assert estimate_transfer_s(PROFILE_NU, [1000], 1, s, broadcast=True) > 0
+
+
+def test_lowpass_inside_band_is_not_supported(rng):
+    fs = 48000
+    sweeps, recs, sil = _simulate(fs, 23000, rng, lowpass=18000)
+    res = analyze_hardware_check(fs, sweeps, recs, sil, 23000)
+    assert res.verdict("nu") in ("marginal", "not supported")
+    assert res.verdict("au") == "supported"
+    assert res.brick_wall_hz is not None and 17000 < res.brick_wall_hz < 18500
