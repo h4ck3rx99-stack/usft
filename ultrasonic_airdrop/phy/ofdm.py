@@ -364,9 +364,10 @@ def analyze_probe(x: FloatArray, train_start: int, silence_start: int, silence_l
     """Per-candidate-carrier SNR (dB) from probe training symbols and the silence gap.
 
     Signal power is the coherent average over the training symbols; noise is the
-    larger of (a) the power measured in the silence gap (which includes the
-    reverberation tail) and (b) the scatter of the training symbols around their
-    mean channel estimate.
+    largest of (a) the background noise in the silence gap, (b) the reverberant
+    tail measured right after the guard interval (an estimate of inter-symbol
+    interference) and (c) the scatter of the training symbols around their mean
+    channel estimate.
     """
     tv = training_values(num)
     starts = train_start + np.arange(tv.shape[0]) * num.sym_len
@@ -380,7 +381,17 @@ def analyze_probe(x: FloatArray, train_start: int, silence_start: int, silence_l
     win_starts = np.arange(silence_start + skip, silence_start + silence_len - num.n, hop)
     if len(win_starts):
         idx = win_starts[:, None] + np.arange(num.n)[None, :]
-        noise_sil = np.mean(np.abs(np.fft.rfft(x[idx], axis=1)[:, num.ofdm_bins]) ** 2, axis=0)
+        pw = np.abs(np.fft.rfft(x[idx], axis=1)[:, num.ofdm_bins]) ** 2
+        # The first window (energy arriving G..G+N after the last symbol) is the reverberant
+        # tail that leaks past the guard interval as inter-symbol interference; the rest of
+        # the gap measures background noise.  Use the worse of the two.
+        late = pw[2:].mean(axis=0) if len(pw) > 2 else pw.mean(axis=0)
+        # Smooth the single tail window over neighbouring carriers (reverberation is
+        # broadband) so its variance does not bias the estimate low on a clean channel.
+        tail = np.convolve(pw[0], np.ones(5) / 5.0, mode="same")
+        tail[:2] = pw[0][:2]
+        tail[-2:] = pw[0][-2:]
+        noise_sil = np.maximum(tail, late)
     else:
         noise_sil = scatter
     noise = np.maximum(noise_sil, scatter) + 1e-30

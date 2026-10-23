@@ -52,8 +52,10 @@ def recommend(
             mask_arr = np.nan_to_num(snr, nan=-99.0) >= need - CARRIER_SLACK_DB
             if mask_arr.sum() < MIN_OFDM_CARRIERS:
                 continue
-            mean_db = float(10 * np.log10(np.mean(10 ** (snr[mask_arr] / 10))))
-            if mean_db >= need:
+            # Median in dB: robust to a few carriers whose (4-symbol) estimate is
+            # optimistic, which a linear mean over a hand-picked subset would reward.
+            typical_db = float(np.median(snr[mask_arr]))
+            if typical_db >= need:
                 return mode_id, CarrierMask.from_array(mask_arr)
     full = CarrierMask.all()
     if not np.isnan(mfsk_snr_db) and supported(1, caps) and mfsk_snr_db >= REQUIRED_SNR_DB[1] + margin_db:

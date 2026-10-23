@@ -240,13 +240,15 @@ def get_mode(mode_id: int) -> ModeSpec:
 # SNR thresholds for mode selection.
 #
 # Units: the receiver's *estimator* outputs — MFSK per-tone bin SNR for modes 0/1
-# and mean per-carrier SNR over the enabled carriers for OFDM modes 2–5 (probe
-# measurement or differential-EVM estimate, which agree within ~0.5 dB).
+# and per-carrier SNR over the enabled carriers for OFDM modes 2–5.
 # Derived from docs/SNR_CURVES.md (tools/snr_curves.py: 50 frames per point,
-# 1 dB steps, AWGN + 150 ppm): the lowest selection-metric SNR at which the
-# frame error rate is <= 2 % at that and every stronger point, rounded up to
-# 0.5 dB.  On the 1 dB grid C0 and C1 OFDM curves coincide, so the C1 entries
-# are nudged 0.5 dB above C0.  Mode selection adds MODE_SNR_MARGIN_DB on top.
+# 1 dB steps, AWGN + 150 ppm): the frame's own estimator SNR at the lowest in-band
+# SNR where the frame error rate is <= 2 % at that and every stronger point,
+# rounded up to 0.5 dB.  On a clean channel the PROBE metric (which also counts
+# the reverberant tail as noise) reads 0.6–1.0 dB below the data-frame estimator,
+# so probe-based selection is slightly conservative.  On the 1 dB grid the C0
+# and C1 DBPSK curves coincide, so mode 3 is nudged 0.5 dB above mode 2.  Mode
+# selection adds MODE_SNR_MARGIN_DB on top.
 # --------------------------------------------------------------------------------------
 
 REQUIRED_SNR_DB: Final[dict[int, float]] = {
@@ -254,15 +256,16 @@ REQUIRED_SNR_DB: Final[dict[int, float]] = {
     1: 11.5,
     2: 7.5,
     3: 8.0,
-    4: 10.5,
+    4: 11.0,
     5: 12.5,
 }
 MODE_SNR_MARGIN_DB: Final = 3.0
 #: An OFDM carrier is enabled only if its SNR is at least this far above the
 #: mode's required mean SNR minus this slack.
 CARRIER_SLACK_DB: Final = 3.0
-#: Minimum number of enabled carriers for an OFDM mode to be considered.
-MIN_OFDM_CARRIERS: Final = 16
+#: Minimum number of enabled carriers for an OFDM mode to be considered (fewer carriers
+#: also means fewer pilots for phase tracking; small masks proved unreliable in reverb).
+MIN_OFDM_CARRIERS: Final = 24
 #: Differential detection doubles noise; EVM-derived SNR is corrected by this.
 DIFFERENTIAL_SNR_CORRECTION_DB: Final = 3.0
 

@@ -22,10 +22,11 @@ broadcast mode, optional authenticated encryption, a PySide6 GUI and a CLI.
 ## What to expect
 
 * **It is slow.** Acoustic links between ordinary laptops carry tens to a few hundred
-  bytes per second. Design targets (not measurements): about **15–25 B/s** in the robust
-  MFSK modes and **80–170 B/s** in the OFDM modes under good conditions (short distance,
-  quiet room, good hardware). A 100 KB file takes **1.5–2 hours** in robust mode and
-  ~10–20 minutes in the fastest mode; multi-megabyte files take many hours. The app
+  bytes per second. In simulation the robust MFSK modes deliver about **13–18 B/s** and the
+  OFDM modes **~95–225 B/s** (data phase) under good conditions — these are design targets
+  for short distance, quiet room and good hardware, *not* measurements. A 100 KB file takes
+  **1.5–2 hours** in robust mode and roughly 8–20 minutes in the fastest mode; multi-megabyte
+  files take many hours. The app
   shows an airtime estimate before anything is transmitted. Text and other compressible
   files are zlib-compressed automatically, which helps a lot.
 * **Distance:** designed for 0.3–2 m. In rooms with strong reverberation the OFDM
@@ -205,11 +206,29 @@ it is resampled to 48 kHz if needed).
 is the received MFSK reference power over the noise power in a 3 kHz band; 16 KB of random
 (incompressible) data, AWGN, 150 ppm clock offset, no reverberation, fixed mode:
 
-<!-- PERF_TABLE -->
+| Mode | PHY / FEC | Data-phase goodput | Whole-transfer goodput (incl. offer, probe, manifest, END) | Transfer time |
+|---:|---|---:|---:|---:|
+| 0 | MFSK, RS nsym 64 | 13.7 B/s | 13.4 B/s | 20 min 22 s |
+| 1 | MFSK, RS nsym 32 | 18.2 B/s | 17.7 B/s | 15 min 25 s |
+| 2 | OFDM DBPSK, nsym 64 | 96.0 B/s | 84.4 B/s | 3 min 14 s |
+| 3 | OFDM DBPSK, nsym 32 | 111.8 B/s | 96.4 B/s | 2 min 50 s |
+| 4 | OFDM DQPSK, nsym 64 | 187.9 B/s | 148.0 B/s | 1 min 51 s |
+| 5 | OFDM DQPSK, nsym 32 | 224.1 B/s | 169.6 B/s | 1 min 37 s |
+
+In-band SNR 25 dB for these runs (every mode error-free); goodput counts acknowledged
+on-air bytes, so it includes FEC, framing, ACK turnarounds and the 300 ms reverberation waits.
 
 Adaptive transfers (mode chosen by probe and ACK feedback):
 
-<!-- ADAPT_TABLE -->
+| Scenario (simulated) | File | Result | Final mode | Goodput (whole transfer) | Notes |
+|---|---|---|---|---:|---|
+| SNR 25 dB, +150 ppm | 16 KB | verified | 5 | 155.9 B/s | probe chose mode 5 directly |
+| SNR 18 dB, −200 ppm, RT60 0.3 s (DRR 6 dB) | 4 KB | verified | 1 | 15.6 B/s | the probe counts the reverberant tail as noise and stays on MFSK (conservative; DBPSK would have worked in this particular room, but fails in others) |
+| SNR 8 dB, +150 ppm, RT60 0.3 s, 5 % frame loss | 4 KB | verified | 0 | 9.9 B/s | 18 % data-frame loss incl. bursts; 28 units retransmitted |
+| SNR 15 dB, +100 ppm, encrypted | 4 KB | verified | 2 | 48.1 B/s | 79 B/s in the data phase |
+| Broadcast, SNR 15 dB, 2 passes, mode 1 | 4 KB | verified | 1 | 10.2 B/s | both passes always sent |
+
+Reproduce with e.g. `airdrop simulate file.bin --snr 18 --ppm -200 --reverb 0.3`.
 
 Frame-error-rate curves per mode: [docs/SNR_CURVES.md](docs/SNR_CURVES.md). Summary of the
 FER ≤ 2 % thresholds: MFSK modes work down to about −5 dB in-band SNR, DBPSK OFDM needs
@@ -221,8 +240,8 @@ same RT60 when the direct-to-reverberant ratio is ≥ ~12 dB (short distance).
 ## Testing
 
 ```bash
-pytest                    # fast suite (~4 min): unit, channel simulations, integration, GUI smoke test
-pytest -m slow            # long simulations (99 % frame success over 100 frames; 64 KB transfer)
+pytest                    # fast suite (~3 min): unit, channel simulations, integration, GUI smoke test
+pytest -m "slow or not slow"   # everything incl. long simulations (~4 min): 100-frame operating point, 64 KB transfer
 ruff check . && ruff format --check .
 mypy                      # strict on the core packages, relaxed for gui/
 python tools/snr_curves.py --frames 50 --step 1 --snr-min -10 --snr-max 22 --out docs/SNR_CURVES.md --csv docs/snr_curves.csv
@@ -238,7 +257,7 @@ Hardware testing is manual: see [docs/HARDWARE_TESTING.md](docs/HARDWARE_TESTING
 ## Known limitations
 
 * **Not validated on real hardware** (see above).
-* Throughput is fundamentally low (tens to ~170 B/s simulated); large files take hours.
+* Throughput is fundamentally low (13–225 B/s simulated); large files take hours.
 * Half-duplex: a machine cannot hear while it transmits; every window costs an ACK
   turnaround (~5 s).
 * The guard interval (5.3 ms) is short compared with room reverberation; OFDM modes need

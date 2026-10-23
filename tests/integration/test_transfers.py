@@ -115,7 +115,13 @@ def test_lost_acks_trigger_poll(tmp_path, make_file, rng):
     f = make_file("polled.bin", rng.integers(0, 256, 600, dtype=np.uint8).tobytes())
     dest = tmp_path / "dest"
     res = run_transfer(
-        [f], dest, FAST, TransferOptions(compression=False), ch(18, 0, 12), ch(18, 0, 13, loss=0.4), seed=8
+        [f],
+        dest,
+        FAST,
+        TransferOptions(compression=False, fixed_mode=1),
+        ch(18, 0, 12),
+        ch(18, 0, 13, loss=0.5),
+        seed=8,
     )
     assert res.sender_success and res.receiver_success, (res.sender_message, res.receiver_message)
     assert res.sender_stats["polls"] > 0

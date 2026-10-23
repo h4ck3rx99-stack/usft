@@ -152,6 +152,9 @@ encoding).
 
 ### 1.8 Receiver timing (informative)
 
+* Probe SNR per carrier: signal = |mean channel estimate over the 4 training symbols|²;
+  noise = max(background noise in the silence gap, energy of the reverberant tail in the
+  first FFT window after the guard, scatter of the 4 per-symbol estimates).
 * Detection: band-pass (Butterworth order 4, zero-phase, band ± 500 Hz), envelope
   correlation with analytic chirp templates; accept when peak ≥ 8 × median of the
   surrounding envelope (CFAR) **and** a down-chirp peak lies *C* ± 64 samples later;
@@ -374,8 +377,11 @@ missed ACKs → step down one mode. OFDM frames use the mask from the latest ACK
 
 **ACK construction**: `base_seq` = max(0, highest seq received − 63); bitmap of received
 seqs in [base, base + 63]; suggested mode and mask from the receiver's SNR estimates
-(probe, then OFDM per-carrier EVM and MFSK SNR level changes) using
-`REQUIRED_SNR_DB` + 3 dB margin; if > 25 % of the window's frames failed, the
+(probe, then OFDM per-carrier EVM and MFSK SNR level changes): for each OFDM mode from
+fastest to slowest, the mask is the carriers with SNR ≥ requirement + 3 dB margin − 3 dB
+slack; the mode is chosen if the mask has ≥ 24 carriers and their median SNR ≥ requirement +
+3 dB (`REQUIRED_SNR_DB` in `config.py`); otherwise mode 1 if the MFSK SNR ≥ its requirement +
+3 dB, else mode 0; if > 25 % of the window's frames failed, the
 suggestion is at most the last mode − 1.
 
 **Resume**: partial files are `<dest>/.airdrop-partial/<sha256>.part` with a sidecar
